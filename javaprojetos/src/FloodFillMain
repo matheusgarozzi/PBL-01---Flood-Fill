@@ -1,0 +1,163 @@
+import java.awt.Color;
+import java.util.Scanner;
+
+public class FloodFillMain {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Digite o caminho da imagem PNG de entrada: ");
+        String caminhoEntrada = scanner.nextLine().trim();
+
+        if (caminhoEntrada.isEmpty()) {
+            caminhoEntrada = "entrada.png";
+            System.out.println("Usando arquivo padrão: " + caminhoEntrada);
+        }
+
+        String caminhoSaida = caminhoEntrada.replace(".png", "_resultado.png");
+
+        ImageProcessor processador = new ImageProcessor(caminhoEntrada, caminhoSaida);
+
+        if (!processador.carregarImagem()) {
+            System.err.println("Não foi possível carregar a imagem. Encerrando.");
+            scanner.close();
+            return;
+        }
+
+        System.out.println("\nImagem carregada: " + processador.getLargura() + " x " + processador.getAltura() + " pixels");
+        System.out.print("Digite a coordenada X inicial (0 a " + (processador.getLargura() - 1) + "): ");
+        int x = scanner.nextInt();
+
+        System.out.print("Digite a coordenada Y inicial (0 a " + (processador.getAltura() - 1) + "): ");
+        int y = scanner.nextInt();
+
+        System.out.print("Digite o valor R da nova cor (0-255): ");
+        int r = Math.max(0, Math.min(255, scanner.nextInt()));
+
+        System.out.print("Digite o valor G da nova cor (0-255): ");
+        int g = Math.max(0, Math.min(255, scanner.nextInt()));
+
+        System.out.print("Digite o valor B da nova cor (0-255): ");
+        int b = Math.max(0, Math.min(255, scanner.nextInt()));
+
+        Color novaCor = new Color(r, g, b);
+        System.out.println("Nova cor selecionada: RGB(" + r + ", " + g + ", " + b + ")");
+
+        System.out.println("\nEscolha a estrutura de dados:");
+        System.out.println("1 - Pilha");
+        System.out.println("2 - Fila");
+        System.out.println("3 - Ambas (comparação)");
+        System.out.print("Opção: ");
+        int opcao = scanner.nextInt();
+
+        System.out.print("\nDeseja criar uma animação GIF do processo? (s/n): ");
+        scanner.nextLine(); // Limpa o buffer
+        String criarGif = scanner.nextLine().toLowerCase();
+        boolean gerarGif = criarGif.equals("s") || criarGif.equals("sim");
+
+        FloodFillAlgorithm algoritmo = new FloodFillAlgorithm(processador);
+
+        long tempoInicio, tempoFim;
+
+        switch (opcao) {
+            case 1:
+                tempoInicio = System.currentTimeMillis();
+                algoritmo.executarComPilha(x, y, novaCor);
+                tempoFim = System.currentTimeMillis();
+                System.out.println("Tempo de execução (Pilha): " + (tempoFim - tempoInicio) + "ms");
+
+                if (gerarGif) {
+                    criarGifAnimacao(caminhoEntrada.replace(".png", "_resultado"), "_pilha");
+                }
+                break;
+
+            case 2:
+                tempoInicio = System.currentTimeMillis();
+                algoritmo.executarComFila(x, y, novaCor);
+                tempoFim = System.currentTimeMillis();
+                System.out.println("Tempo de execução (Fila): " + (tempoFim - tempoInicio) + "ms");
+
+                if (gerarGif) {
+                    criarGifAnimacao(caminhoSaida.replace(".png", ""), "_fila");
+                }
+                break;
+
+            case 3:
+                ImageProcessor processador2 = new ImageProcessor(caminhoEntrada,
+                        caminhoEntrada.replace(".png", "_resultado_fila.png"));
+                processador2.carregarImagem();
+                FloodFillAlgorithm algoritmo2 = new FloodFillAlgorithm(processador2);
+
+                System.out.println("\n--- Testando com PILHA ---");
+                tempoInicio = System.currentTimeMillis();
+                algoritmo.executarComPilha(x, y, novaCor);
+                tempoFim = System.currentTimeMillis();
+                long tempoPilha = tempoFim - tempoInicio;
+
+                System.out.println("\n--- Testando com FILA ---");
+                tempoInicio = System.currentTimeMillis();
+                algoritmo2.executarComFila(x, y, novaCor);
+                tempoFim = System.currentTimeMillis();
+                long tempoFila = tempoFim - tempoInicio;
+
+                System.out.println("\n=== COMPARAÇÃO DE DESEMPENHO ===");
+                System.out.println("Tempo Pilha: " + tempoPilha + "ms");
+                System.out.println("Tempo Fila: " + tempoFila + "ms");
+                System.out.println("Diferença: " + Math.abs(tempoPilha - tempoFila) + "ms");
+
+                processador2.salvarImagem();
+
+                if (gerarGif) {
+                    System.out.println("\nGerando GIFs das animações...");
+                    criarGifAnimacao(caminhoSaida.replace(".png", ""), "_pilha");
+                    criarGifAnimacao(caminhoEntrada.replace(".png", "_resultado_fila"), "_fila");
+                }
+                break;
+
+            default:
+                System.err.println("Opção inválida!");
+                scanner.close();
+                return;
+        }
+
+        processador.salvarImagem();
+
+        System.out.println("\nProcessamento concluído!");
+        System.out.println("Imagem resultado salva com sucesso.");
+        if (opcao == 3) {
+            System.out.println("Resultado (Pilha): " + caminhoSaida);
+            System.out.println("Resultado (Fila): " + caminhoEntrada.replace(".png", "_resultado_fila.png"));
+        }
+
+        if (gerarGif) {
+            System.out.println("Animação(ões) GIF criada(s) com sucesso!");
+        }
+
+        scanner.close();
+    }
+
+
+    private static void criarGifAnimacao(String basePath, String sufixo) {
+        try {
+            System.out.println("Criando GIF" + sufixo + "...");
+
+            String caminhoGif = basePath + sufixo + "_animacao.gif";
+
+            GifAnimator animator = new GifAnimator(caminhoGif, 200);
+
+            animator.carregarFramesDeArquivos(basePath);
+
+            if (animator.getNumeroFrames() > 0) {
+                animator.gerarGif();
+                System.out.println("GIF" + sufixo + " criado: " + caminhoGif);
+            } else {
+                System.out.println(" Nenhum frame encontrado para criar GIF" + sufixo);
+            }
+
+            animator.limparFrames();
+
+        } catch (Exception e) {
+            System.err.println("Erro ao criar GIF" + sufixo + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
