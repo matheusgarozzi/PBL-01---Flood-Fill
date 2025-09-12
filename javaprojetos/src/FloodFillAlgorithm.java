@@ -111,7 +111,7 @@ public class FloodFillAlgorithm {
         pixelsProcessados++;
 
         if (pixelsProcessados % 1000 == 0) {
-            System.out.println("📊 Pixels processados: " + pixelsProcessados);
+            System.out.println(" Pixels processados: " + pixelsProcessados);
         }
 
         return true;
@@ -130,4 +130,5 @@ public class FloodFillAlgorithm {
         fila.enfileirar(new Ponto(x, y + 1));
         fila.enfileirar(new Ponto(x, y - 1));
     }
+
 }
