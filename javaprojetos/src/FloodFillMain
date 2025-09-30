@@ -13,7 +13,11 @@ public class FloodFillMain {
             System.out.println("Usando arquivo padrão: " + caminhoEntrada);
         }
 
-        String caminhoSaida = caminhoEntrada.replace(".png", "_resultado.png");
+        // Usamos um caminho base para os frames temporários, já que não vamos salvar o GIF final.
+        // O ImageProcessor ainda precisa de um caminho de saída final.
+        String caminhoSaidaBase = caminhoEntrada.replace(".png", "_resultado");
+        String caminhoSaida = caminhoSaidaBase + ".png";
+
 
         ImageProcessor processador = new ImageProcessor(caminhoEntrada, caminhoSaida);
 
@@ -24,11 +28,20 @@ public class FloodFillMain {
         }
 
         System.out.println("\nImagem carregada: " + processador.getLargura() + " x " + processador.getAltura() + " pixels");
-        System.out.print("Digite a coordenada X inicial (0 a " + (processador.getLargura() - 1) + "): ");
-        int x = scanner.nextInt();
+        
+        // Validação básica de entrada para x, y
+        int x = -1, y = -1;
+        try {
+            System.out.print("Digite a coordenada X inicial (0 a " + (processador.getLargura() - 1) + "): ");
+            x = scanner.nextInt();
+            System.out.print("Digite a coordenada Y inicial (0 a " + (processador.getAltura() - 1) + "): ");
+            y = scanner.nextInt();
+        } catch (java.util.InputMismatchException e) {
+            System.err.println("Coordenada inválida. Encerrando.");
+            scanner.close();
+            return;
+        }
 
-        System.out.print("Digite a coordenada Y inicial (0 a " + (processador.getAltura() - 1) + "): ");
-        int y = scanner.nextInt();
 
         System.out.print("Digite o valor R da nova cor (0-255): ");
         int r = Math.max(0, Math.min(255, scanner.nextInt()));
@@ -49,14 +62,24 @@ public class FloodFillMain {
         System.out.print("Opção: ");
         int opcao = scanner.nextInt();
 
-        System.out.print("\nDeseja criar uma animação GIF do processo? (s/n): ");
+        System.out.print("\nDeseja exibir a **animação do processo no terminal**? (s/n): ");
         scanner.nextLine(); // Limpa o buffer
-        String criarGif = scanner.nextLine().toLowerCase();
-        boolean gerarGif = criarGif.equals("s") || criarGif.equals("sim");
+        String criarAnimacao = scanner.nextLine().toLowerCase();
+        boolean gerarAnimacaoTerminal = criarAnimacao.equals("s") || criarAnimacao.equals("sim");
+        
+        // Pergunta extra para a animação
+        boolean usarCoresAnsi = false;
+        if (gerarAnimacaoTerminal) {
+            System.out.print("Deseja usar cores ANSI (requer terminal compatível)? (s/n): ");
+            usarCoresAnsi = scanner.nextLine().toLowerCase().equals("s");
+        }
+
 
         FloodFillAlgorithm algoritmo = new FloodFillAlgorithm(processador);
-
         long tempoInicio, tempoFim;
+
+        // O base path para os frames será 'caminhoSaidaBase', pois o ImageProcessor
+        // salvará os frames como 'caminhoSaidaBase_frame_XXXX.png'
 
         switch (opcao) {
             case 1:
@@ -65,8 +88,9 @@ public class FloodFillMain {
                 tempoFim = System.currentTimeMillis();
                 System.out.println("Tempo de execução (Pilha): " + (tempoFim - tempoInicio) + "ms");
 
-                if (gerarGif) {
-                    criarGifAnimacao(caminhoEntrada.replace(".png", "_resultado"), "_pilha");
+                if (gerarAnimacaoTerminal) {
+                    // MODIFICAÇÃO: Chama a função que exibe no terminal
+                    exibirAnimacaoNoTerminal(caminhoSaidaBase, usarCoresAnsi);
                 }
                 break;
 
@@ -76,26 +100,29 @@ public class FloodFillMain {
                 tempoFim = System.currentTimeMillis();
                 System.out.println("Tempo de execução (Fila): " + (tempoFim - tempoInicio) + "ms");
 
-                if (gerarGif) {
-                    criarGifAnimacao(caminhoSaida.replace(".png", ""), "_fila");
+                if (gerarAnimacaoTerminal) {
+                    // MODIFICAÇÃO: Chama a função que exibe no terminal
+                    exibirAnimacaoNoTerminal(caminhoSaidaBase, usarCoresAnsi);
                 }
                 break;
 
             case 3:
-                ImageProcessor processador2 = new ImageProcessor(caminhoEntrada,
-                        caminhoEntrada.replace(".png", "_resultado_fila.png"));
+                // Novo processador para a FILA, garantindo que o P2 não sobrescreva os frames do P1.
+                // Usaremos um caminho de saída diferente para os frames da Fila.
+                String saidaBaseFila = caminhoEntrada.replace(".png", "_resultado_fila");
+                ImageProcessor processador2 = new ImageProcessor(caminhoEntrada, saidaBaseFila + ".png");
                 processador2.carregarImagem();
                 FloodFillAlgorithm algoritmo2 = new FloodFillAlgorithm(processador2);
 
                 System.out.println("\n--- Testando com PILHA ---");
                 tempoInicio = System.currentTimeMillis();
-                algoritmo.executarComPilha(x, y, novaCor);
+                algoritmo.executarComPilha(x, y, novaCor); // Frame base: caminhoSaidaBase
                 tempoFim = System.currentTimeMillis();
                 long tempoPilha = tempoFim - tempoInicio;
 
                 System.out.println("\n--- Testando com FILA ---");
                 tempoInicio = System.currentTimeMillis();
-                algoritmo2.executarComFila(x, y, novaCor);
+                algoritmo2.executarComFila(x, y, novaCor); // Frame base: saidaBaseFila
                 tempoFim = System.currentTimeMillis();
                 long tempoFila = tempoFim - tempoInicio;
 
@@ -106,10 +133,15 @@ public class FloodFillMain {
 
                 processador2.salvarImagem();
 
-                if (gerarGif) {
-                    System.out.println("\nGerando GIFs das animações...");
-                    criarGifAnimacao(caminhoSaida.replace(".png", ""), "_pilha");
-                    criarGifAnimacao(caminhoEntrada.replace(".png", "_resultado_fila"), "_fila");
+                if (gerarAnimacaoTerminal) {
+                    System.out.println("\nExibindo animações...");
+                    // Animação da Pilha
+                    System.out.println("--- Animação da PILHA ---");
+                    exibirAnimacaoNoTerminal(caminhoSaidaBase, usarCoresAnsi);
+                    
+                    // Animação da Fila
+                    System.out.println("\n--- Animação da FILA ---");
+                    exibirAnimacaoNoTerminal(saidaBaseFila, usarCoresAnsi);
                 }
                 break;
 
@@ -128,36 +160,33 @@ public class FloodFillMain {
             System.out.println("Resultado (Fila): " + caminhoEntrada.replace(".png", "_resultado_fila.png"));
         }
 
-        if (gerarGif) {
-            System.out.println("Animação(ões) GIF criada(s) com sucesso!");
-        }
-
         scanner.close();
     }
 
 
-    private static void criarGifAnimacao(String basePath, String sufixo) {
+    /**
+     * NOVO método para exibir a animação no terminal, substituindo a criação de GIF.
+     * Utiliza a classe TerminalAnimator (que usa a ListaDinamica, o 'ArrayList do zero').
+     */
+    private static void exibirAnimacaoNoTerminal(String basePath, boolean usarCoresAnsi) {
+        // O delay aqui é em milissegundos.
+        int delayMs = 150; 
+        
         try {
-            System.out.println("Criando GIF" + sufixo + "...");
-
-            String caminhoGif = basePath + sufixo + "_animacao.gif";
-
-            GifAnimator animator = new GifAnimator(caminhoGif, 200);
-
-            animator.carregarFramesDeArquivos(basePath);
+            // A classe TerminalAnimator carrega os frames e já os exibe no console.
+            TerminalAnimator animator = new TerminalAnimator(basePath, delayMs);
 
             if (animator.getNumeroFrames() > 0) {
-                animator.gerarGif();
-                System.out.println("GIF" + sufixo + " criado: " + caminhoGif);
+                animator.exibirNoTerminal(usarCoresAnsi); 
             } else {
-                System.out.println(" Nenhum frame encontrado para criar GIF" + sufixo);
+                System.out.println(" Nenhum frame encontrado para exibir animação em: " + basePath);
             }
 
-            animator.limparFrames();
-
+            // A limpeza dos frames é feita dentro do TerminalAnimator.exibirNoTerminal()
+            
         } catch (Exception e) {
-            System.err.println("Erro ao criar GIF" + sufixo + ": " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("Erro ao tentar exibir animação no terminal: " + e.getMessage());
+            //e.printStackTrace();
         }
     }
 }
